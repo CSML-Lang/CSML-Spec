@@ -102,10 +102,11 @@ Both *DOML* and *IR* share the same type system, all the following types **must*
 
 Both *DOML* and *IR* have support for collections and thus the following types **must** be implemented.
 
-- Arrays (collection ID: `0`, collection name: `vec`)
-  - Array elements **must** all have the same type.
-- Dictionaries/Maps (collection ID: `1`, collection name: `map`)
-  - The key type **must** remain constant, and so **must** the value type.
+- Arrays (type ID: `6`, collection name: `vec`)
+  - Array elements **must** all have the same type in strict mode.
+- Dictionaries/Maps (type ID: `7`, collection name: `map`)
+  - The key type **must** remain constant, and so **must** the value type in strict mode.
+> Note: this is only when 'used' they can remain with different types in literal definition but as soon as they are used they must just have the same type.
 
 ### DOML Specifics
 
@@ -306,7 +307,7 @@ A : [B : C] {
 P : C = A[b]
 ```
 
-This is extremely simular to how arrays of objects works so I won't redescribe, it should produce NO IR and purely should be for the user to simplify their code.  Note: the key can only a literal type (excluding objects) so like a string, int, float and so on (using the type names specified in the type section).
+This is extremely similar to how arrays of objects works so I won't redescribe, it should produce NO IR and purely should be for the user to simplify their code.  Note: the key can only a literal type (excluding objects) so like a string, int, float and so on (using the type names specified in the type section).
 
 #### Map Objects
 You can define map objects in code like;
@@ -438,7 +439,22 @@ You can apply a few attributes to your DOML code to provide various different be
 - `#IR_ctor` defines a constructor for the rest of the scope
   - If used within a block only defines for that block if used outside a block defined for entire script.
 - `#IR_type` used to define a type.
-  - i.e. `#IR_type 2 1 3 1 0 0 1` makes a map of string to another map which is int key to a float array.  This can be read like `[str : [int : []flt]]`, and create type would often be expressed like; `#IR_type myType map str map int vec flt`
+  - i.e. `#IR_type 100 1 3 1 0 0 1` makes a map of string to another map which is int key to a float array.  This can be read like `[str : [int : []flt]]`, and create type would often be expressed like; `#IR_type myType map str map int vec flt`.  This type can be used in place of more complex types such as `getmap myType 3, 5.0, "Hey"`
+  
+### The Type System (more relevantly `#IR_type` and its relation to complex types)
+
+How the type system works is quite simple there are two preface types (which are always 'combined' with the type after them) such as if you wanted to use 'getmap' where you had a structure like `[str : [int : []flt]]` you would define it like `getmap str map int vec flt` followed by the arguments.  The type system can be simplified through defining types (the first 100 from 0-99 are reserved by the system) and in simple mode you can use a named type.  Effectively it is broken down like this; when you state `map` you state that you are going to give it two types after it forming the type of the map such as `map str int` (map of `str : int`), and if you give it `vec` you will follow it with a single type for the vector class.  Other structures like tuples may exist in the future.
+
+Note: that vec/map don't count other 'collections' as part of their requirement i.e. `map vec map int flt map flt vec str` is the same as `[[][int : flt] : [flt: []str]]` you can if you want in simple mode use brackets to group things like `map (vec (map (int flt)) map (flt vec (str)))` noting that all brackets are ignored though you can't miscount them, furthermore you could extend it to multiple lines if you wanted but its not suggested you do.  You can use `#IR_type` to define a type allowing you to use it later, you can combine multiple IR_types as they are effectively just 'copied' into their callsite i.e.
+
+```assembly
+#IR_type fltToInt map (flt int)
+#IR_Type strArr vec str
+#IR_type i int
+#IR_type intToStrArr map (i strArr)
+#IR_type fltToInt_To_IntToStrArr map (fltToInt intToStrArr)
+```
+Of course above is an extreme example.  Generally we suggest to avoid doing weird types like arrays as keys and keep it to primatives as some systems won't allow you to actually define a weird type like a vector as a key type (or recommend not too).
 
 ### IR Specifics
 
@@ -495,21 +511,20 @@ They will be in the format `<command>(opcode) < < parameterName: parameterType >
 - `pcall(22) <Register: int> <Type: type> <Function: setter> < <Parameters> ... >`: performs a call with the parameters in the call
 - `pnewobj(23) <Type: type> <Constructor: ctor> <Register: int> < <Parameters> >` Allows you to supply parameters in call.  Parameters have to be calculated at runtime so it is less efficient.
 - `pget(24) <Register: int> <Type: type> <Function: getter> < <Parameters> ... >`: same as `pcall` but functions like `get`.
-- `quickget(25) <Register: int> <Type: obj> <Getter: get> <ReturnType: TypeID>` very similar in nature to `quickcall` but functions like `getn`
+- `quickget(25) <Register: int> <Type: type> <Getter: get>` very similar in nature to `quickcall` but functions like `get`
 - `pusharray(30) <Type: TypeID> <Len: int>`: pushes an array of length and type given onto the stack.
-- `setarray(31) <Type: TypeID> <Index: int> <Obj>`: indexes and sets an object.
-- `getarray(32) <Type: TypeID> <Index: int>`: indexes an object and pushes value onto stack.
+- `setarray(31) <Type: TypeID> <Indicies: int[]> <Obj: Type>`: indexes and sets an object.
+- `getarray(32) <Indicies: int[]>`: indexes an object and pushes value onto stack.
 - `arraycpy(33) <Type: TypeID> <Len: int> < <Obj> ... >`: basically builds the array through using a memcpy if it can as in the case of binary streams and in other cases also I'm sure.  Should be more efficient anyway as cuts down number of instructions.
 - `compact(34) <Type: TypeID> <N Dimension: int>` compacts above arrays into dimensions given, i.e. if you give it two arrays will build a 2D array, the order is from top down not down up.
 - `pushmap(40) <KeyType: TypeID> <ValueType: TypeID>` pushes a map onto the stack.
-- `pushcollection(41) <CreatedType: TypeID>` pushes a 'createtype' map
-- `setmap(42) <KeyType: TypeID> <ValueType: TypeID> <Key: KeyType> <Value: ValueType>` indexes and sets map for key and value given.
-- `setcollection(43) <CreatedType: TypeID> < <Key: KeyType> ... > <Value: ValueType>` same as `setmap` but for created types.
-- `quicksetmap(44) <KeyType: TypeID> <ValueType: TypeID> <N: int> < <Key: KeyType> <Value: ValueType> >` just applies multiple set maps in a row, more efficient as less IR but doesn't have any benefits like memcpy.
-- `zipmap(45) <Depth: int> < <KeyType: TypeID> ... > <ValueType: TypeID> <Count: int>` can be an efficient way to mass create a complex map, will zip maps together as per your depth, WON'T however allow you to have arrays for either keys or values.
+- `setmap(41) <KeyTypes: TypeID[]> <KeyType: TypeID> <ValueType: TypeID> < <Key: KeyTypes[0]>, ... > <Value: ValueType>` indexes and sets map for key and value given.
+- `setmapstack(42) <KeyDepth: int>` runs setmap by using the stack.
+- `quicksetmap(43) <KeyTypes: TypeID[]> <ValueType: TypeID> <N: int> < < <Key: KeyTypes[0]>, ... > <Value: ValueType>, ... >` just applies multiple set maps in a row, more efficient as less IR but doesn't have any benefits like memcpy.
+- `zipmap(44) <Depth: int> <KeyTypes: TypeID[]> <ValueType: TypeID> <Count: int>` can be an efficient way to mass create a complex map, will zip maps together as per your depth, WON'T however allow you to have arrays for either keys or values.
   - When calling it, it will pop off items, you give it on the stack like the key is the top (or last pushed) and then next is the 'deeper' map i.e. if you have `[int : [str : flt]]` you would have the `[str : flt]` map at the bottom with the `int` key above each of its corresponding map and if you had `[int : [int : [str : int]]]` you would have the first int key at the top then the second int key with each of its corresponding map i.e. `map01 int1 map02 int2 ... top_int1 map1y inty ... top_int2`.
-- `getmap(46) <KeyType: TypeID> <ValueType: TypeID> <Key: KeyType>` pushes value at key onto stack.  If value doesn't exist for key should push 'NULL'
-- `getcollection(47) <CreatedType: TypeID> < <Key: KeyType> ... >` same as getmap but for created types.
+- `getmap(45) <KeyTypes: TypeID[]> <ValueType: TypeID> < <Key: KeyType[0]>, ... >` pushes value at key onto stack.  If value doesn't exist for key should push 'NULL' if in safe mode else if in strict mode raises panic.
+- `getmapstack(46) <KeyTypes: TypeID[]> <ValueType: TypeID>` same as getmap but uses the stack.
 
 ## Interfacing with DOML
 
