@@ -526,6 +526,10 @@ They will be in the format `<command>(opcode) < < parameterName: parameterType >
 - `getmap(45) <KeyTypes: TypeID[]> <ValueType: TypeID> < <Key: KeyType[0]>, ... >` pushes value at key onto stack.  If value doesn't exist for key should push 'NULL' if in safe mode else if in strict mode raises panic.
 - `getmapstack(46) <KeyTypes: TypeID[]> <ValueType: TypeID>` same as getmap but uses the stack.
 
+#### IR_obj/set/get/ctor
+
+These IR commands are only used in non-simple mode and effectively allow you to cache objects/setters/getters/ctors as to prevent having to both parse the strings and then hash them.  Effectively after defining them you can refer to them as an number which EITHER can be set in the IR_obj/set/get/ctor call or is just presumed to start at 0 and count up.  Thus in every place where you have something like 'RGB' or 'Normalized' they will be replaced with an ID, this will improve the simplicity of non-simple IR.
+
 ## Interfacing with DOML
 
 There are a few ways to interface with *DOML*, each one **should** exist in either a static or reflected binding (offering both could allow users to choose one that is more applicable to them).
