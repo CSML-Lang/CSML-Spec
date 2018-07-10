@@ -2,6 +2,18 @@
 
 This changelog will contain all the various changes to the grammar and syntax of DOML from v0.1 onwards.
 
+## Version 0.3.2
+
+- Type system overhaul, it is much easier to understand and should be more efficient as we have cut out a lot of the commands.
+  - `vec` and `map` are type extenders that is they are to be followed with more types to formulate their types; i.e. `vec int` defines an integer array and `map int str` defines a integer to string map.
+  - This means that push now accepts arrays and maps, and every call previously that took a type can now take vectors/maps, however you still can't put a vector or a map where it expects 'values'.
+- Thus due to above collections are simplified, there is no specific arary/map instructions anymore as they take types to determine what the instruction is.
+  - Thus; `pusharray`, `pushmap`, `setarray`, `setmap`, `arraycpy`, `getarray`, `pushcollection`, `setcollection`, `quicksetmap`, `zipmap`, `getmap`, `getcollection` are all gone.  Replaced with `setindex`, `setindexstack`, `quicksetindex`, `getindex`, `quickgetindex`, `quickcpy`, `compact` (which has been changed to take a more extensive array of types).
+- `push` now allows maps and vecs with vectors requiring a length as the parameter and maps requiring 'void' (or nothing).
+- `vec` and `map` are now typeID 6 and 7 instead of collectionTypeID 0 and 1.  Furthermore collectionTypeIDs are gone.  Furthermore as a consequence #IR_type now requires a number > 99 as the as 0-99 are reserved by the system for future collections (reserving an extreme amount as to not ever run into problems).  As this only effects non simple IR (as simple IR uses string identifiers) I feel that reserving isn't going to cause any issues.
+
+Probably could have been 0.4 worthy in terms of what was done, but I don't feel its ready for a release yet.
+
 ## Version 0.3.1
 
 - `dumbget` is gone
