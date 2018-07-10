@@ -265,26 +265,26 @@ A.B[1] = A.B[2]
 This is a little more complicated then other IR due to the level of optimisation possible SO I'll outline the basic structure, and in the IR section I'll cover some of the optimisations possible;
 
 ```assembly
-pusharray typeID n
-setarray typeID 0 o1
+push vec typeID n
+setindex vec typeID 0 o1
 ...
-setarray typeID n on
+setindex vec typeID n on
 ```
 
 You can perform a wide 'setarray' by doing a 'arraycpy' like, which is significantly more efficient;
 ```assembly
-pusharray typeID n
-arraycpy typeID n o1 o2 ... on
+push vec typeID n
+quickcpy vec typeID n o1 o2 ... on
 ```
 
 Note: if you want array of arrays that are n dimensional and square then you should either use the `setarraynth` command (like `setarraynth typeID x y val`) or the `arraynthcpy` command (like `arraynthcpy typeID N x1 ... xn y1 ... yn z1 ... zn` where N is the row count * height count).  You can also use the compacting method that is (this is required for arrays of maps);
 ```assembly
-pusharray typeID n
-arraycpy typeID n o1 o2 ... on
-pusharray typeID n
-arraycpy typeID n p1 p2 ... pn
+push vec typeID n
+quickcpy vec typeID n o1 o2 ... on
+push vec typeID n
+quickcpy vec typeID n p1 p2 ... pn
 ... ; 'N' times
-compact typeID N
+compact vec typeID N
 ```
 Compact takes type and number of arguments, it then pops those arguments from the stack and places those into the array.  This is the way to build jagged arrays.
 
@@ -332,27 +332,27 @@ Note: you can combine the explicit and implicit into one.
 Maps have somewhat similar IR to arrays.
 
 ```assembly
-pushmap typeID typeID
-setmap typeID typeID key value
+push map typeID typeID
+setindex map typeID typeID key value
 ```
 Setting multiple values can be shorted to
 ```assembly
-pushmap typeID typeID
-quicksetmap typeID typeID k1 v1, ..., kn vn
+push map typeID typeID
+quickcpy map typeID typeID n k1 v1, ..., kn vn
 ```
 
 typeID can only contain the types stated in the type section.  If you want a map of arrays (and same for map of maps) then you have to do the following;
 
 For map of maps that are one dimensional
 ```assembly
-pushmap typeID typeID
-quicksetmap typeID typeID k1 v1, ..., kn vn
+push map typeID typeID
+setindex map typeID typeID k1 v1, ..., kn vn
 push typeID new_key1
-pushmap typeID typeID
+push map typeID typeID
 push typeID new_key2
-quicksetmap typeID typeID k2_1 v2_1, ..., k2_n v2_n
+setindex map typeID typeID k2_1 v2_1, ..., k2_n v2_n
 ... ; 'N' times
-zipmap 1 typeID typeID typeID N
+compact map typeID map typeID typeID N
 ```
 The above takes a collection type along with the new key type and the old map types that is you can view it like `zipmap 1 [typeID : [typeID : typeID]] N`, note how I had to push elements after each one, if you don't want to do that then you can create a complex map.
 
@@ -367,8 +367,8 @@ That is to create a string map of a int to array of floats map that is `[str : [
 That is you create a type and call it ID `2` with depth `3` and that it is a map (1) then you state its a `string` (id 3) and its collection type is map (1) then you state the key value is int (0) and the value is array (0) then you state the type is float (1).  So yeh... it is quite complex to define them but once they are defined you can just use them like any other collection type i.e.;
 ```assembly
 ; If not in simple would refer to it as '2' as that is what the type was defined as
-pushcollection myType
-setcollection myType string_value int_value n float_0 ... float_n
+push myType ; no length as type is a map
+setindex myType string_value int_value n float_0 ... float_n
 ```
 where `n` is the number of items in the array.  As you can see the type system is quite sophisticated, once more try not to abuse collections, and if you can completely avoid them that is preferred.  This is more down to the user then you but still trying to expand the uses of zip map to more types if you can is important.  Doing maps of maps just gets icky and for most users they will just define simple map structures, though maps of arrays are also a bit icky so in the future having a nicer command for them could exist.
 
@@ -498,6 +498,8 @@ They will be in the format `<command>(opcode) < < parameterName: parameterType >
   - The count refers to how many parameters there are.
 - `push(11) <Type: typeID> < <Parameter: parameter> >`: pushes objects of the same type onto the stack
   - All parameters have to match the type given.
+  - If pushing an array a size is required (multiple if multiple dimensions)
+  - If pushing a map no parameters are to be given.
 - `call(12) <Register: int> <Type: type> <Function: setter>`: calls a register object of a certain type along with the number of stack objects given.
   - If you want to call an object on the stack you have to use `callstack` or simply `regobj` to register an object to a register then you can follow up with a `calln` (which is faster if you are doing multiple calls).
 - `callstack(13) <Type: obj> <Function: setter>`: calls a function of type given on the top object of the stack (doesn't pop it).
@@ -512,19 +514,15 @@ They will be in the format `<command>(opcode) < < parameterName: parameterType >
 - `pnewobj(23) <Type: type> <Constructor: ctor> <Register: int> < <Parameters> >` Allows you to supply parameters in call.  Parameters have to be calculated at runtime so it is less efficient.
 - `pget(24) <Register: int> <Type: type> <Function: getter> < <Parameters> ... >`: same as `pcall` but functions like `get`.
 - `quickget(25) <Register: int> <Type: type> <Getter: get>` very similar in nature to `quickcall` but functions like `get`
-- `pusharray(30) <Type: TypeID> <Len: int>`: pushes an array of length and type given onto the stack.
-- `setarray(31) <Type: TypeID> <Indicies: int[]> <Obj: Type>`: indexes and sets an object.
-- `getarray(32) <Indicies: int[]>`: indexes an object and pushes value onto stack.
-- `arraycpy(33) <Type: TypeID> <Len: int> < <Obj> ... >`: basically builds the array through using a memcpy if it can as in the case of binary streams and in other cases also I'm sure.  Should be more efficient anyway as cuts down number of instructions.
-- `compact(34) <Type: TypeID> <N Dimension: int>` compacts above arrays into dimensions given, i.e. if you give it two arrays will build a 2D array, the order is from top down not down up.
-- `pushmap(40) <KeyType: TypeID> <ValueType: TypeID>` pushes a map onto the stack.
-- `setmap(41) <KeyTypes: TypeID[]> <KeyType: TypeID> <ValueType: TypeID> < <Key: KeyTypes[0]>, ... > <Value: ValueType>` indexes and sets map for key and value given.
-- `setmapstack(42) <KeyDepth: int>` runs setmap by using the stack.
-- `quicksetmap(43) <KeyTypes: TypeID[]> <ValueType: TypeID> <N: int> < < <Key: KeyTypes[0]>, ... > <Value: ValueType>, ... >` just applies multiple set maps in a row, more efficient as less IR but doesn't have any benefits like memcpy.
-- `zipmap(44) <Depth: int> <KeyTypes: TypeID[]> <ValueType: TypeID> <Count: int>` can be an efficient way to mass create a complex map, will zip maps together as per your depth, WON'T however allow you to have arrays for either keys or values.
+- `setindex(30) <Type: TypeID> <Indexes> <Value: Value>`: indexes and sets an object
+  - The indexes are dependent on the type.
+- `setindexstack(31) <Type: TypeID>`: indexes and sets the top object with the keys following it and the value after that, all on the stack.
+- `quicksetindex(32) <Type: TypeID> <Indexes>`: indexes an object and sets it to the value on the quick index.
+- `getindex(33) <Type: TypeID> <Indexes>`: indexes an object and pushes value onto stack.
+- `quickgetindex(33) <Type: TypeID> <Indexes>`: indexes an object and pushes value onto quick index.
+- `quickcpy(34) <Type: TypeID> <Lengths: int[]> < <Obj> ... >` Allows you to build arrays and maps through a single call, still requires a push prior to this however.
+- `compact(35) <Type: TypeID> <N Dimension: int>` compacts above arrays into dimensions given, i.e. if you give it two arrays will build a 2D array, the order is from top down not down up.  Will also compact maps.
   - When calling it, it will pop off items, you give it on the stack like the key is the top (or last pushed) and then next is the 'deeper' map i.e. if you have `[int : [str : flt]]` you would have the `[str : flt]` map at the bottom with the `int` key above each of its corresponding map and if you had `[int : [int : [str : int]]]` you would have the first int key at the top then the second int key with each of its corresponding map i.e. `map01 int1 map02 int2 ... top_int1 map1y inty ... top_int2`.
-- `getmap(45) <KeyTypes: TypeID[]> <ValueType: TypeID> < <Key: KeyType[0]>, ... >` pushes value at key onto stack.  If value doesn't exist for key should push 'NULL' if in safe mode else if in strict mode raises panic.
-- `getmapstack(46) <KeyTypes: TypeID[]> <ValueType: TypeID>` same as getmap but uses the stack.
 
 #### IR_obj/set/get/ctor
 
