@@ -3,8 +3,10 @@
 <img src="./DOML.png" width="100">
 
 > By Braedon Wooding
-> Latest Version 0.3.1
+> Latest Version 0.3.2
 >> No promises on breaking changes, I'll try to keep compatibility however and most compilers will support you down grading your version or explicitly not allow it.
+
+Find the [changelog](changelog.md) or the [formal specification document](doml_formal_spec.md)
 
 ## What is DOML?
 
@@ -124,13 +126,13 @@ When you put this into a parser you'll get something like this; compilers are fr
   quickcall #NewObj Color Name
 
   newobj Tags Tags #MyTags
-  pusharray str 5
-  arraycpy str "Hello", "Other", "bits", "bobs", "kick"
+  push vec str 5
+  quickcpy vec str "Hello", "Other", "bits", "bobs", "kick"
   call #MyTags Tags SetTags
 
   get #MyTags Tags GetTags
-  quickindexarray str 0
-  pop 1 ; ^^ won't be popped up this, the array will
+  quickgetindex vec str 0
+  pop 1 ; ^^ the array will get popped not ^^ as ^^ is a quick call and goes to a separate register.
   quickcall #MyTags Tags Name
 
   push flt 0.5 1.2 3.5
