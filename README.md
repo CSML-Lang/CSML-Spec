@@ -83,20 +83,6 @@ When you put this into a parser you'll get something like this; compilers are fr
 ; This is the resulting bytecode from the file given
 ; This bytecode will be overriden if new bytecode is generated.
 # IR simple {
-  ; Sets up a cache
-  # IR_obj Color
-  # IR_obj Tags
-  # IR_ctor Tags::Tags
-  # IR_ctor Color::Color
-  # IR_ctor Color::Normalized
-  # IR_set Color.RGB
-  # IR_set Color.Name
-  # IR_get Color.Name
-  # IR_set Color.R
-  # IR_set Color.G
-  # IR_set Tags.SetTags
-  # IR_get Tags.GetTags
-  # IR_set Tags.Name
   init 4 4 ; Initialises the stack and registers
   ; This is a comment
   ; Construct a new Color
